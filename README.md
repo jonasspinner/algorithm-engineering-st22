@@ -62,3 +62,7 @@ your implementation or any other name you can reasonably expect to be unique.
 This is so we can merge your code with that of other students without name clashes.
 (It is strongly forbidden to use top-level <code>using namespace</code> in your headers as that defeats the point
 of namespaces all together.)
+
+## Submission of your code
+To submit the final version of your project (deadline will be at the beginning of septemer) you can simply send us a link to the repository (on github, scc-gitlab, etc.) into which you have forked this framework + the final commit hash/release via email.
+
