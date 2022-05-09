@@ -21,9 +21,10 @@ There are three parts to this repository:
 ## Usage
 You need cmake (version 3.16+) and a C++17-capable compiler to build this project.
 We strongly encourage using a Linux system to develop your code.
-(If you are on Windows you can also look into Linux virtual machines.)
+(If you are on Windows, you can also look into Linux virtual machines.)
 Our binary library currently only supports GCC version 10+ and Clang version 10+.
-If you absolutely need to use a different compiler, we may be able
+We're planning to include support for MSVC so development on Windows is possible. 
+If you absolutely need to use a different (publicly available) compiler, we may be able
 to provide another library binary file to use with that compiler.
 In that case, please contact us with the compiler you wish to use.
 
