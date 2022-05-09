@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/home/matthias/Promotion/code/algorithm_engineering2022/build/benchmark",
-  "command": "/usr/bin/c++  -I/home/matthias/Promotion/code/algorithm_engineering2022/benchmark/. -I/home/matthias/Promotion/code/algorithm_engineering2022/src/. -Wall -Wextra -Wpedantic -Wnull-dereference -g -O3 -march=native -flto -fno-fat-lto-objects -std=c++17 -o CMakeFiles/mst_construction_benchmark.dir/mst_construction_benchmark.cpp.o -c /home/matthias/Promotion/code/algorithm_engineering2022/benchmark/mst_construction_benchmark.cpp",
-  "file": "/home/matthias/Promotion/code/algorithm_engineering2022/benchmark/mst_construction_benchmark.cpp"
-}
-]
