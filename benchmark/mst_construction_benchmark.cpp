@@ -52,6 +52,14 @@ void execute_benchmark(I& instrumentation, const algen::WEdgeList& edge_list, co
 
     }
 }
+static bool verify_input_list(const algen::WEdgeList& edge_list, const algen::VertexId num_vertices) {
+    const auto [correct, msg] = edge_list_format_check(edge_list, num_vertices);
+    if (!correct) {
+        std::cerr << "Input edge list does not fulfill requirements: " << msg
+                  << std::endl;
+    }
+    return correct;
+}
 
 std::pair<bool, std::string> verify_result(const algen::WEdgeList& graph_edges,
                                            const algen::WEdgeList& result,
@@ -79,43 +87,34 @@ int main(int argc, char** argv) try {
   using namespace algen;
   const auto options = benchmark::parse<Options>(argc, argv);
 
-  // demo how to use gnm generator
+  // Generate random input graph with size specified in parameters
   benchmark::GNM_Generator generator;
-  const std::size_t log_n = 16;
-  const std::size_t log_m = 16;        // number undirected edges
-  const Weight max_edge_weight = 255;  // max edge weight
+  constexpr std::size_t log_n = mst_construction::params::graph_generator_params.log_n;
+  constexpr std::size_t log_m = mst_construction::params::graph_generator_params.log_m;
+  constexpr Weight max_edge_weight = mst_construction::params::graph_generator_params.max_weight;
   generator.configure(log_n, log_m, max_edge_weight);
   auto gen_edges = generator.generate();
   std::stringstream graph_name;
   graph_name << "generated_graph_" << log_n << "_" << log_m << "_"
              << max_edge_weight;
 
-  const bool print_generated_edges = false;
+  static constexpr bool print_generated_edges = false;
   if (print_generated_edges) {
     print_container(gen_edges);
   }
 
-  const VertexId num_vertices = 1ull << log_n;
+  constexpr VertexId num_vertices = 1ull << log_n;
+  assert(verify_input_list(gen_edges, num_vertices));
 
-  auto verify_input_list = [&] {
-    const auto [correct, msg] = edge_list_format_check(gen_edges, num_vertices);
-    if (!correct) {
-      std::cerr << "Input edge list does not fulfill requirements: " << msg
-                << std::endl;
-    }
-    return correct;
-  };
-  assert(verify_input_list());
-
+  // Prepare time measurement, output and result verification
   benchmark::TimeInstrumentation instrumentation;
   benchmark::CsvOutput output(options.output_file);
   output.print_header(instrumentation);
-
-
   const auto verify = [&](WEdgeList& result) -> std::pair<bool, std::string> {
         return verify_result(gen_edges, result, num_vertices);
   };
 
+  // Execute all contenders on the generated input graph
   benchmark::for_each(
       mst_construction::params::contenders, [&](auto& contender) {
         execute_benchmark(instrumentation, gen_edges, num_vertices,

@@ -26,6 +26,8 @@ Contender(std::string_view, F) -> Contender<F>;
 // graph. It should return an edge list (in any order) that represents the MST
 // of the input graph. For the format requirements that any edge list has to
 // fulfill, see edge_list_format_check() in includes/utils.hpp.
+
+// Register your contenders in this tuple:
 constexpr std::tuple contenders{
     // Some examples:
 
@@ -65,5 +67,12 @@ constexpr std::tuple contenders{
 constexpr auto num_contenders = std::tuple_size_v<decltype(contenders)>;
 
 constexpr std::size_t iterations = 1;
+
+constexpr struct {
+    std::size_t log_n = 16; // number of vertices = 2^(log_n)
+    std::size_t log_m = 16; // number undirected edges = 2^(log_m)
+    algen::Weight max_weight = 255; // maximum weight of generated edges
+} graph_generator_params;
+
 }  // end namespace params
 }  // end namespace mst_construction

@@ -36,7 +36,7 @@ namespace benchmark {
         // If num_changed_edges == 0, this returns a correct MST; otherwise it returns an ST that is not an MST.
         // Assumes that the graph is sufficiently dense to support randomly choosing edges until enough MSF-heavy edges
         // have been found to replace MSF edges.
-        algen::WEdgeList generate_corrupted_mst(const uint num_changed_edges, const bool print_status = false) const {
+        algen::WEdgeList generate_corrupted_mst(const std::size_t num_changed_edges, const bool print_status = false) const {
 
             if (print_status) std::cout << "editing " << num_changed_edges << " edges of the MSF ... " << std::flush;
 

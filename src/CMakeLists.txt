@@ -18,8 +18,7 @@ else ()
     # The benchmark executables need the parameters included here,
     # so don't remove them if you list your sources manually.
     add_library(implementation STATIC
-            ${srcs} ${headers}
-            mst_construction_parameters.hpp)
+            ${srcs} ${headers})
 
     set_target_properties(implementation PROPERTIES LINKER_LANGUAGE CXX)
     target_include_directories(implementation INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
