@@ -10,7 +10,7 @@ There are three parts to this repository:
         system automatically, although you still need to register your implementation in the corresponding 
         <code>*_parameters.hpp</code> file. The given example contenders indicate how to register your 
         implementation. </li>
-    <li><code>binaries</code> contains a library as a binary file <code>libbinaries-*.a</code> which provides methods 
+    <li><code>binaries</code> contains a library as a binary file <code>libbinaries-*.a</code>/<code>binaries-*.lib</code> which provides methods 
         used by the framework as defined in <code>includes/binary_includes.hpp</code>. You are not allowed 
         to use these methods in your implementations. (Exception: If you work on "Aufgabe 4: Linear-Time MST 
         Algorithmus mit Blackbox", you are allowed to use the <code>are_edges_light()</code> method as the MST 
@@ -22,7 +22,7 @@ There are three parts to this repository:
 You need cmake (version 3.16+) and a C++17-capable compiler to build this project.
 We strongly encourage using a Linux system to develop your code.
 (If you are on Windows you can also look into Linux virtual machines.)
-Our binary library currently only supports GCC version 10+ and Clang version 10+.
+Our binary library currently only supports GCC version 10+, Clang version 10+ and MSVC version 14+ (Make sure you use the latest version of VS 2022 Community Edition).
 If you absolutely need to use a different compiler, we may be able
 to provide another library binary file to use with that compiler.
 In that case, please contact us with the compiler you wish to use.
