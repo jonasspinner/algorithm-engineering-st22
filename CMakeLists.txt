@@ -55,6 +55,7 @@ target_include_directories(base_target INTERFACE ${CMAKE_SOURCE_DIR})
 
 add_subdirectory(src)
 add_subdirectory(benchmark)
+add_subdirectory(tests)
 
 message(${CMAKE_SYSTEM})
 

@@ -10,7 +10,7 @@ There are three parts to this repository:
         system automatically, although you still need to register your implementation in the corresponding 
         <code>*_parameters.hpp</code> file. The given example contenders indicate how to register your 
         implementation. </li>
-    <li><code>binaries</code> contains a library as a binary file <code>libbinaries-*.a</code> which provides methods 
+    <li><code>binaries</code> contains a library as a binary file <code>libbinaries-*.a</code>/<code>binaries-*.lib</code> which provides methods 
         used by the framework as defined in <code>includes/binary_includes.hpp</code>. You are not allowed 
         to use these methods in your implementations. (Exception: If you work on "Aufgabe 4: Linear-Time MST 
         Algorithmus mit Blackbox", you are allowed to use the <code>are_edges_light()</code> method as the MST 
@@ -21,12 +21,20 @@ There are three parts to this repository:
 ## Usage
 You need cmake (version 3.16+) and a C++17-capable compiler to build this project.
 We strongly encourage using a Linux system to develop your code.
+
 (If you are on Windows, you can also look into Linux virtual machines.)
 Our binary library currently only supports GCC version 10+ and Clang version 10+.
 We're planning to include support for MSVC so development on Windows is possible. 
-If you absolutely need to use a different (publicly available) compiler, we may be able
-to provide another library binary file to use with that compiler.
+If you absolutely need to use a different (publicly available) compiler, we may 
+be able to provide another library binary file to use with that compiler.
 In that case, please contact us with the compiler you wish to use.
+
+[//]: # (&#40;If you are on Windows you can also look into Linux virtual machines.&#41;)
+
+[//]: # (Our binary library currently only supports GCC version 10+, Clang version 10+ and MSVC version 14+ &#40;If you use Windows, make sure you use the latest version of VS 2022 Community Edition&#41;.)
+
+[//]: # (If you absolutely need to use a different compiler, we may be able)
+
 
 CMake helps build and package your code.
 If you're unfamiliar, this might help you get started (on UNIX):
@@ -63,3 +71,7 @@ your implementation or any other name you can reasonably expect to be unique.
 This is so we can merge your code with that of other students without name clashes.
 (It is strongly forbidden to use top-level <code>using namespace</code> in your headers as that defeats the point
 of namespaces all together.)
+
+## Submission of your code
+To submit the final version of your project (deadline will be at the beginning of septemer) you can simply send us a link to the repository (on github, scc-gitlab, etc.) into which you have forked this framework + the final commit hash/release via email.
+

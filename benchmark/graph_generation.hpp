@@ -4,6 +4,8 @@
 #include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
+#include <numeric>
 #include <random>
 #include <unordered_set>
 
