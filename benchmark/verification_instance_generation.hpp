@@ -44,7 +44,7 @@ namespace benchmark {
             auto first_sf_out_edge = first_msf_out_edge_;
 
             assert(algen::edge_list_format_check(sf_edges, num_vertices_).first);
-            for (int i = 0; i < num_changed_edges; ++i) {
+            for (std::size_t i = 0; i < num_changed_edges; ++i) {
                 find_random_cycle_and_edit(sf_edges, first_sf_out_edge);
             }
             assert(algen::edge_list_format_check(sf_edges, num_vertices_).first);
