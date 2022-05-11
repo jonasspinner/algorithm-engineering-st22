@@ -38,6 +38,11 @@ cmake-build-debug*/
 cmake-build-release*/
 cmake-build-relwithdebinfo*/
 
+### Visual Studio IDE files
+.vs/
+out/
+CMakeSettings.json
+
 ### cmake internediates
 build
 

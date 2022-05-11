@@ -1,6 +1,7 @@
 
 #include <exception>
 #include <iostream>
+#include <sstream>
 #include <vector>
 
 #include "benchmark_helpers.hpp"

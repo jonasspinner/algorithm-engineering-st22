@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <sstream>
 #include "mst_verification_parameters.hpp"
 #include "includes/definitions.hpp"
 #include "includes/utils.hpp"
