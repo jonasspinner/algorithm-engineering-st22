@@ -262,17 +262,27 @@ std::pair<bool, std::string> is_spanning_forest(const WEdgeList& graph_edges,
   return {true, "Is spanning tree."};
 }
 
+
+/// The EdgeClassifier serves as the black box for "Aufgabe 4: Linear-Time MST Algorithmus mit Blackbox".
+/// It will measure the combined time in ns that all calls to execute() take.
+/// This is used by the framework to subtract the time spent in the black box from your running time.
+/// You may not modify the time measurement and may not call reset() or get_time_in_nanoseconds() yourself.
 class EdgeClassifier {
   friend inline EdgeClassifier& getEdgeClassifier();
 
  public:
+
+  /// Given the edge list edges of an entire graph, a spanning tree spanning_tree of that graph,
+  /// and the number of vertices n in the graph, this method checks which graph edges are light
+  /// wrt to spanning_tree. It returns a bool vector bv of size m:=edges.size()
+  /// s.t. bv[i] iff edges[i] is light wrt spanning_tree (i = 0, .., m-1).
   std::vector<bool> execute(const algen::WEdgeList& edges,
                             const algen::WEdgeList& spanning_tree,
-                            std::size_t n) {
+                            const std::size_t n) {
     REORDERING_BARRIER
     const auto start = std::chrono::steady_clock::now();
     REORDERING_BARRIER
-    const auto result = ::are_edges_light(edges, spanning_tree, n, false);
+    auto result = ::are_edges_light(edges, spanning_tree, n, false);
     REORDERING_BARRIER
     const auto stop = std::chrono::steady_clock::now();
     REORDERING_BARRIER

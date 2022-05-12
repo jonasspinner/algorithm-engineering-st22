@@ -12,9 +12,7 @@ There are three parts to this repository:
         implementation. </li>
     <li><code>binaries</code> contains a library as a binary file <code>libbinaries-*.a</code>/<code>binaries-*.lib</code> which provides methods 
         used by the framework as defined in <code>includes/binary_includes.hpp</code>. You are not allowed 
-        to use these methods in your implementations. (Exception: If you work on "Aufgabe 4: Linear-Time MST 
-        Algorithmus mit Blackbox", you are allowed to use the <code>are_edges_light()</code> method as the MST 
-        verification black box.)</li>
+        to call these methods in your implementations.</li>
 </ul>
 
 
@@ -61,6 +59,12 @@ If you want to adapt the provided implementations, copy them to <code>src</code>
 and place them into a custom namespace (see below).
 This way, you'll still have the baseline implementation as a reference for your evaluation.
 If you feel you need to make changes to the benchmarking or reference code, let us know.
+
+If you work on "Aufgabe 4: Linear-Time MST Algorithmus mit Blackbox", you may use 
+<code>algen::EdgeClassifier</code> as the black box for determining edges that are light wrt. to a sample MST.
+Please acquire the singleton instance using <code>algen::getEdgeClassifier()</code> as the framework uses it to measure
+the time spent in the black box. The framework subtracts this time from the total running time of your algorithm.
+The class may not be used for any task other than Aufgabe 4.
 
 ## Requirements
 In order to work with the included benchmarks, your code will need to provide the expected API.

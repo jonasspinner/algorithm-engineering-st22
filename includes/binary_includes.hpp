@@ -13,9 +13,9 @@ algen::WEdgeList fast_kruskal(algen::WEdgeList edges);
 // and the number of vertices n in the graph, this method checks which graph edges are light
 // wrt to spanning_tree. It returns a bool vector bv of size m:=edges.size()
 // s.t. bv[i] iff edges[i] is light wrt spanning_tree (i = 0, .., m-1).
-// You are not allowed to call this method in your implementation unless you work on
-// "Aufgabe 4: Linear-Time MST Algorithmus mit Blackbox" in which case this method serves as
-// the MST verification black box needed in the algorithm.
+// You are not allowed to call this method in your implementation.
+// If you work on "Aufgabe 4: Linear-Time MST Algorithmus mit Blackbox" use
+// algen::getEdgeClassifier() as your black box instead.
 std::vector<bool> are_edges_light(const algen::WEdgeList& edges, const algen::WEdgeList& spanning_tree, std::size_t n, bool perform_checks = false);
 
 // Given the edge list edges of an entire graph, a spanning tree spanning_tree of that graph,
