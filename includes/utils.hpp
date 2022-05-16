@@ -12,7 +12,11 @@
 
 namespace algen {
 
+#ifdef _MSC_VER
+#define REORDERING_BARRIER _ReadWriteBarrier();
+#else
 #define REORDERING_BARRIER asm volatile("" ::: "memory");
+#endif
 
 template <typename EdgeType>
 struct TailHeadOrder {
