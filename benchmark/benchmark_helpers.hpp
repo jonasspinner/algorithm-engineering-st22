@@ -56,7 +56,7 @@ struct CsvOutput {
       template <class I>
       void print_header(const I& instr) {
           line.str("");
-          line << "contender, input_graph, iteration";
+          line << "contender, input_graph, iteration, num_vertices, num_edges";
           for (auto m : instr)
               line << ", factory_" << m.key;
           for (auto m : instr)

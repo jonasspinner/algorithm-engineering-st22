@@ -1,5 +1,7 @@
 #pragma once
 
+#include "benchmark/verification_instance_generation.hpp"
+#include "includes/binary_includes.hpp"
 #include "naive_jarnik_prim.hpp"
 #include "naive_kruskal.hpp"
 
@@ -19,7 +21,8 @@ Contender(std::string_view, F) -> Contender<F>;
 // The factory must be callable without parameters.
 // The algorithm instance must be callable with an edge list as its argument,
 // i.e. it must define
-//      WEdgeList operator()(const WEdgeList& edge_list, const VertexId num_vertices)
+//      WEdgeList operator()(const WEdgeList& edge_list, const VertexId
+//      num_vertices)
 //      {...}.
 // The call operator serves as the main interface for computing the MST.
 // It must accept an edge list (in arbitrary order) that represents the input
@@ -32,47 +35,80 @@ constexpr std::tuple contenders{
     // Some examples:
 
     // Slow kruskal, deactivate for larger graphs (log_m > 16)
-    Contender{"naive_kruskal", [] { return NaiveKruskal(); }},
+    // Contender{"naive_kruskal", [] { return NaiveKruskal(); }},
 
     // Faster kruskal from the binary library
-    Contender{"fast_kruskal", [] {
-        return [](const algen::WEdgeList& el, const algen::VertexId n) {
-            return fast_kruskal(el, n);
-        };
-    }},
+    Contender{"fast_kruskal",
+              [] {
+                return [](const algen::WEdgeList& el, const algen::VertexId n) {
+                  return fast_kruskal(el, n);
+                };
+              }},
 
     // Jarnik-Prim with inefficient addressable PQ
     Contender{"naive_jarnik_prim", [] { return NaiveJarnikPrim(); }},
 
     // An example returning a badly formatted edge list
-    Contender{"outputs_badly_formatted_edge_list", [] {
-        return [](const algen::WEdgeList& el, const algen::VertexId) {
-            algen::WEdgeList el_copy = el;
-            // Duplicate edge so edge list will fail sanity check
-            el_copy.push_back(el.back());
-            return el_copy;
-        };
-    }},
+    // Contender{"outputs_badly_formatted_edge_list",
+    //          [] {
+    //            return [](const algen::WEdgeList& el, const algen::VertexId) {
+    //              algen::WEdgeList el_copy = el;
+    //              // Duplicate edge so edge list will fail sanity check
+    //              el_copy.push_back(el.back());
+    //              return el_copy;
+    //            };
+    //          }},
 
-    // An example returning a spanning tree that is not an MST
-    Contender{"outputs_corrupted_mst", [] {
-        return [](const algen::WEdgeList& el, const algen::VertexId n) {
-            using namespace algen;
-            auto call_fast_kruskal = [](const WEdgeList& edges, const VertexId n) { return fast_kruskal(edges, n);};
-            benchmark::CorruptedMSTGenerator<decltype(call_fast_kruskal)> instance_gen;
-            instance_gen.preprocess(el, n, call_fast_kruskal);
-            return instance_gen.generate_corrupted_mst(1);
-        };
-    }}};
+    //// An example returning a spanning tree that is not an MST
+    // Contender{"outputs_corrupted_mst", [] {
+    //            return [](const algen::WEdgeList& el, const algen::VertexId n)
+    //            {
+    //              using namespace algen;
+    //              auto call_fast_kruskal = [](const WEdgeList& edges,
+    //                                          const VertexId n) {
+    //                return fast_kruskal(edges, n);
+    //              };
+    //              benchmark::CorruptedMSTGenerator<decltype(call_fast_kruskal)>
+    //                  instance_gen;
+    //              instance_gen.preprocess(el, n, call_fast_kruskal);
+    //              return instance_gen.generate_corrupted_mst(1);
+    //            };
+    //          }}
+};
 constexpr auto num_contenders = std::tuple_size_v<decltype(contenders)>;
 
-constexpr std::size_t iterations = 1;
+constexpr std::size_t iterations = 4;
+struct Experiment {
+  std::size_t log_n;
+  std::size_t edge_factor;
+  algen::Weight max_weight;
+  friend std::ostream& operator<<(std::ostream& out, const Experiment& exp) {
+    return out << "Experiment Config = (" << exp.log_n << ", "
+               << exp.edge_factor << ", " << exp.max_weight << ")";
+  }
+};
 
-constexpr struct {
-    std::size_t log_n = 16; // number of vertices = 2^(log_n)
-    std::size_t log_m = 16; // number undirected edges = 2^(log_m)
-    algen::Weight max_weight = 255; // maximum weight of generated edges
-} graph_generator_params;
+struct ExperimentSuite {
+  std::size_t log_n_begin = 14;
+  std::size_t log_n_end = 17;
+  std::size_t edge_factor_begin = 1;
+  std::size_t edge_factor_end = 256;
+  algen::Weight max_weight = 255;
+  std::size_t step_size_n = 1;
+  std::size_t step_size_edge_factor = 2;
+  std::size_t cur_log_n = log_n_begin;
+  std::size_t cur_edge_factor = edge_factor_begin;
+  bool has_next() { return cur_log_n <= log_n_end; }
+  Experiment get_next() {
+    Experiment exp{cur_log_n, cur_edge_factor, max_weight};
+    cur_edge_factor *= step_size_edge_factor;
+    if (cur_edge_factor > edge_factor_end) {
+      cur_edge_factor = edge_factor_begin;
+      cur_log_n += step_size_n;
+    }
+    return exp;
+  }
+};
 
 }  // end namespace params
 }  // end namespace mst_construction

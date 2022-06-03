@@ -79,10 +79,15 @@ class GNM_Generator {
     seed_ = seed;
   }
 
+  std::string name() const {
+    return "GNM";
+  }
+
   // implementation follows approach from Batagelj, Vladimir, and Ulrik Brandes.
   // "Efficient generation of large random networks." Physical Review E 71.3
   // (2005): 036113.
   algen::WEdgeList generate() const {
+    std::cout << "\tstart graph gen" << std::endl;
     using namespace algen;
     if (log_n_ == 0 || log_m_ == 0) {
       return WEdgeList{};
@@ -105,7 +110,7 @@ class GNM_Generator {
       } while (selected_edges.count(edge_id) == 1);
       selected_edges.insert(edge_id);
     }
-    std::cout << "finish sample edges" << std::endl;
+    std::cout << "\t\tstop sample edges" << std::endl;
     for (const auto& id : selected_edges) {
       const auto edge = get_tail_head_from_id(id);
       const Weight w = uniform_weight_dist(gen);
@@ -113,10 +118,11 @@ class GNM_Generator {
       edge_list.emplace_back(edge.head, edge.tail, w);
     }
     postprocessing_and_checks(edge_list, m);
-    std::cout << "finish get names" << std::endl;
+    std::cout << "\t\tstop postprocessing" << std::endl;
     if (show_degree_stats_) {
       print_log_degree_stats(edge_list, log_n_);
     }
+    std::cout << "\tstop graph gen" << std::endl;
     return edge_list;
   }
 
