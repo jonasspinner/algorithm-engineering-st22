@@ -70,6 +70,12 @@ This is so we can merge your code with that of other students without name clash
 (It is strongly forbidden to use top-level <code>using namespace</code> in your headers as that defeats the point
 of namespaces all together.)
 
+## Plots
+You find some suggestions/help for plots in <code>plots</code>. You can execute the plotting scripts as follows:
+``` shell
+Rscript ./evaluation_mst_construction.r --infile <path to .csv file> --outfile <name of pdf file with plots>
+```
+
 ## Submission of your code
-To submit the final version of your project (deadline will be at the beginning of septemer) you can simply send us a link to the repository (on github, scc-gitlab, etc.) into which you have forked this framework + the final commit hash/release via email.
+To submit the final version of your project (deadline will be at the beginning of september) you can simply send us a link to the repository (on github, scc-gitlab, etc.) into which you have forked this framework + the final commit hash/release via email.
 
