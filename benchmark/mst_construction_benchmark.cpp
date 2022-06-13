@@ -119,7 +119,7 @@ int main(int argc, char** argv) try {
     assert(verify_input_list(gen_edges, num_vertices));
     std::cout << "\tstop verification input" << std::endl;
 
-    // Prepare time measurement, output and result verification
+    // Prepare result verification
     const auto verify = [&](WEdgeList& result) -> std::pair<bool, std::string> {
       std::cout << "\tstart verification result" << std::endl;
       auto res = verify_result(gen_edges, result, num_vertices);

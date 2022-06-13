@@ -63,15 +63,56 @@ namespace mst_verification {
                 };
         constexpr auto num_contenders = std::tuple_size_v<decltype(contenders)>;
 
-        constexpr std::size_t iterations = 1;
+        constexpr std::size_t iterations = 4;
+        struct Experiment {
+            std::size_t log_n;
+            std::size_t edge_factor;
+            std::size_t num_changed_edges;
+            algen::Weight max_weight;
+            bool generateNewGraph;
+            friend std::ostream& operator<<(std::ostream& out, const Experiment& exp) {
+                return out << "Experiment Config = ("
+                           << exp.log_n << ", "
+                           << exp.edge_factor << ", "
+                           << exp.num_changed_edges << ", "
+                           << exp.max_weight << ")";
+            }
+        };
 
-        constexpr struct {
-            std::size_t log_n = 16; // number of vertices = 2^(log_n)
-            std::size_t log_m = 16; // number undirected edges = 2^(log_m)
-            algen::Weight max_weight = 255; // maximum weight of generated edges
-        } graph_generator_params;
+        struct ExperimentSuite {
+            std::size_t log_n_begin = 14;
+            std::size_t log_n_end = 17;
+            std::size_t edge_factor_begin = 1;
+            std::size_t edge_factor_end = 256;
+            bool try_yes_instances = true;
+            std::size_t num_changed_edges_begin = 1;
+            std::size_t num_changed_edges_end = 1000;
+            algen::Weight max_weight = 255;
+            std::size_t step_size_log_n = 1;
+            std::size_t step_size_edge_factor = 2;
+            std::size_t step_size_num_changed_edges = 10;
 
-        constexpr std::size_t num_changed_edges = 100; // ST instance for verification algorithms is constructed by changing num_changed_edges in a valid MST
+            std::size_t cur_log_n = log_n_begin; // Generate a graph with 2^cur_log_n vertices
+            std::size_t cur_edge_factor = edge_factor_begin; // Generate a graph with cur_edge_factor times as many edges as vertices
+            std::size_t cur_num_changed_edges = try_yes_instances? 0 : num_changed_edges_begin; // Construct an ST instance by changing cur_num_changed_edges in a valid MST
+
+            bool has_next() const { return cur_log_n <= log_n_end; }
+            Experiment get_next() {
+                const bool need_new_graph = (try_yes_instances && cur_num_changed_edges == 0) || (!try_yes_instances && cur_num_changed_edges == num_changed_edges_begin);
+                Experiment exp{cur_log_n, cur_edge_factor, cur_num_changed_edges, max_weight, need_new_graph};
+                cur_num_changed_edges = (try_yes_instances && cur_num_changed_edges == 0)? num_changed_edges_begin : cur_num_changed_edges * step_size_num_changed_edges;
+                if (cur_num_changed_edges > num_changed_edges_end) {
+                    cur_num_changed_edges = try_yes_instances? 0 : num_changed_edges_begin;
+                    cur_edge_factor *= step_size_edge_factor;
+                    if (cur_edge_factor > edge_factor_end) {
+                        cur_edge_factor = edge_factor_begin;
+                        cur_log_n += step_size_log_n;
+                    }
+                }
+                return exp;
+            }
+        };
+
 
     }  // end namespace params
 }

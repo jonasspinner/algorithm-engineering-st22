@@ -98,7 +98,7 @@ struct ExperimentSuite {
   std::size_t step_size_edge_factor = 2;
   std::size_t cur_log_n = log_n_begin;
   std::size_t cur_edge_factor = edge_factor_begin;
-  bool has_next() { return cur_log_n <= log_n_end; }
+  bool has_next() const { return cur_log_n <= log_n_end; }
   Experiment get_next() {
     Experiment exp{cur_log_n, cur_edge_factor, max_weight};
     cur_edge_factor *= step_size_edge_factor;

@@ -5,31 +5,24 @@
 
 namespace benchmark {
 
-    // Generates instances for an MST verification algorithm by constructing a correct MST and for a given number k
+    // Generates instances for an MST verification algorithm by accepting a correct MST and for a given number k
     // changing k edges s.t. the resulting spanning tree is no longer an MST.
-    template<typename MSTAlgo>
     class CorruptedMSTGenerator {
-
-        static_assert(std::is_invocable_r_v<algen::WEdgeList, MSTAlgo, const algen::WEdgeList&, const algen::VertexId>);
 
     public:
 
         CorruptedMSTGenerator() = default;
 
         // Computes an MST for the given graph to be used by subsequent calls to generate_corrupted_mst().
-        void preprocess(const algen::WEdgeList& graph_edge_list, const algen::VertexId num_vertices, const MSTAlgo& mst_algo, const std::size_t seed = 1, const bool print_status = false) {
-
-            if (print_status) std::cout << "computing MSF for generating corrupted MSTs as ST instances ... " << std::flush;
+        void preprocess(const algen::WEdgeList& graph_edge_list, const algen::WEdgeList& msf_edge_list, const algen::VertexId num_vertices, const std::size_t seed = 1) {
 
             num_vertices_ = num_vertices;
             seed_ = seed;
             graph_edges_ = graph_edge_list;
             make_inefficient_adjacency_structure(graph_edges_, first_graph_out_edge_, num_vertices);
 
-            msf_edges_ = mst_algo(graph_edge_list, num_vertices);
+            msf_edges_ = msf_edge_list;
             make_inefficient_adjacency_structure(msf_edges_, first_msf_out_edge_, num_vertices);
-
-            if (print_status) std::cout << " done." << std::endl;
         }
 
         // Generate an ST by changing num_changed_edges edges in the MST generated in the last call to configure().
