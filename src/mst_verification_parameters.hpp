@@ -37,7 +37,7 @@ namespace mst_verification {
                     // Some examples:
 
                     // A naive MST verifier that executes one DFS in the given ST per graph edge.
-                    Contender{"naive_dfs_verify", [] { return NaiveDFSBasedVerifier(); }},
+//                    Contender{"naive_dfs_verify", [] { return NaiveDFSBasedVerifier(); }},
 
                     // An MST verifier that is implemented in the binary library.
                     Contender{"fast_verify_from_binary", [] {
@@ -47,23 +47,24 @@ namespace mst_verification {
                     }},
 
                     // An example contender that always outputs yes (not very accurate).
-                    Contender{"always_outputs_yes", [] {
-                        return [](const algen::WEdgeList&, const algen::WEdgeList&, const int) {
-                            return std::optional<algen::WEdge>();
-                        };
-                    }},
+//                    Contender{"always_outputs_yes", [] {
+//                        return [](const algen::WEdgeList&, const algen::WEdgeList&, const int) {
+//                            return std::optional<algen::WEdge>();
+//                        };
+//                    }},
 
                     // An example contender that always outputs no and outputs an ST edge as a counter example
                     // (which is always an invalid counter example).
-                    Contender{"always_outputs_no_with_bad_counter_example", [] {
-                        return [](const algen::WEdgeList&, const algen::WEdgeList& st_edges, const int) {
-                            return std::optional<algen::WEdge>(st_edges.front());
-                        };
-                    }}
+//                    Contender{"always_outputs_no_with_bad_counter_example", [] {
+//                        return [](const algen::WEdgeList&, const algen::WEdgeList& st_edges, const int) {
+//                            return std::optional<algen::WEdge>(st_edges.front());
+//                        };
+//                    }}
                 };
         constexpr auto num_contenders = std::tuple_size_v<decltype(contenders)>;
 
-        constexpr std::size_t iterations = 4;
+        constexpr std::size_t iterations = 10;
+
         struct Experiment {
             std::size_t log_n;
             std::size_t edge_factor;

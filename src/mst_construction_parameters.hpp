@@ -46,7 +46,7 @@ constexpr std::tuple contenders{
               }},
 
     // Jarnik-Prim with inefficient addressable PQ
-    Contender{"naive_jarnik_prim", [] { return NaiveJarnikPrim(); }},
+//    Contender{"naive_jarnik_prim", [] { return NaiveJarnikPrim(); }},
 
     // An example returning a badly formatted edge list
     // Contender{"outputs_badly_formatted_edge_list",
@@ -59,21 +59,17 @@ constexpr std::tuple contenders{
     //            };
     //          }},
 
-    //// An example returning a spanning tree that is not an MST
-    // Contender{"outputs_corrupted_mst", [] {
-    //            return [](const algen::WEdgeList& el, const algen::VertexId n)
-    //            {
-    //              using namespace algen;
-    //              auto call_fast_kruskal = [](const WEdgeList& edges,
-    //                                          const VertexId n) {
-    //                return fast_kruskal(edges, n);
-    //              };
-    //              benchmark::CorruptedMSTGenerator<decltype(call_fast_kruskal)>
-    //                  instance_gen;
-    //              instance_gen.preprocess(el, n, call_fast_kruskal);
-    //              return instance_gen.generate_corrupted_mst(1);
-    //            };
-    //          }}
+    // An example returning a spanning tree that is not an MST
+//     Contender{"outputs_corrupted_mst", [] {
+//                return [](const algen::WEdgeList& el, const algen::VertexId n)
+//                {
+//                  using namespace algen;
+//                  auto correct_mst = fast_kruskal(el, n);
+//                  benchmark::CorruptedMSTGenerator instance_gen(1337);
+//                  instance_gen.preprocess(el, correct_mst, n);
+//                  return instance_gen.generate_corrupted_mst(1);
+//                };
+//              }}
 };
 constexpr auto num_contenders = std::tuple_size_v<decltype(contenders)>;
 

@@ -49,6 +49,9 @@ build
 ### IntelliJ IDE files
 *.iml
 
+### RStudio IDE files
+*.Rhistory
+
 ### Evaluation files
 *.pdf
 *.csv

@@ -97,7 +97,7 @@ int main(int argc, char** argv) try {
   mst_construction::params::ExperimentSuite experiments;
   benchmark::CsvOutput output(options.output_file);
   benchmark::TimeInstrumentation instrumentation;
-  output.print_header(instrumentation);
+  output.print_mst_construction_header(instrumentation);
   while (experiments.has_next()) {
     const auto experiment = experiments.get_next();
     std::cout << experiment << std::endl;

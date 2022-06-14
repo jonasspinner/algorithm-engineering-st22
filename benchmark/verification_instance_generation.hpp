@@ -11,13 +11,12 @@ namespace benchmark {
 
     public:
 
-        CorruptedMSTGenerator() = default;
+        CorruptedMSTGenerator(const std::size_t seed = 1) : gen_(seed) {}
 
         // Computes an MST for the given graph to be used by subsequent calls to generate_corrupted_mst().
-        void preprocess(const algen::WEdgeList& graph_edge_list, const algen::WEdgeList& msf_edge_list, const algen::VertexId num_vertices, const std::size_t seed = 1) {
+        void preprocess(const algen::WEdgeList& graph_edge_list, const algen::WEdgeList& msf_edge_list, const algen::VertexId num_vertices) {
 
             num_vertices_ = num_vertices;
-            seed_ = seed;
             graph_edges_ = graph_edge_list;
             make_inefficient_adjacency_structure(graph_edges_, first_graph_out_edge_, num_vertices);
 
@@ -29,7 +28,7 @@ namespace benchmark {
         // If num_changed_edges == 0, this returns a correct MST; otherwise it returns an ST that is not an MST.
         // Assumes that the graph is sufficiently dense to support randomly choosing edges until enough MSF-heavy edges
         // have been found to replace MSF edges.
-        algen::WEdgeList generate_corrupted_mst(const std::size_t num_changed_edges, const bool print_status = false) const {
+        algen::WEdgeList generate_corrupted_mst(const std::size_t num_changed_edges, const bool print_status = false) {
 
             if (print_status) std::cout << "editing " << num_changed_edges << " edges of the MSF ... " << std::flush;
 
@@ -58,7 +57,7 @@ namespace benchmark {
             return false;
         }
 
-        void find_random_cycle_and_edit(algen::WEdgeList& sf_edges, std::vector<algen::EdgeIdx>& first_sf_out_edge) const {
+        void find_random_cycle_and_edit(algen::WEdgeList& sf_edges, std::vector<algen::EdgeIdx>& first_sf_out_edge) {
 
             using namespace algen;
 
@@ -80,11 +79,10 @@ namespace benchmark {
             std::vector<VertexId> next_sf_edge_offset(num_vertices_);
             std::stack<VertexId, std::vector<VertexId>> active;
 
-            std::mt19937 gen(seed_);
             std::uniform_int_distribution<std::size_t> uniform_vertex_dist(0, num_vertices_ - 1);
-            while (true) {
+//            while (true) {
                 // Draw random start vertex for DFS
-                const VertexId s = uniform_vertex_dist(gen);
+                const VertexId s = uniform_vertex_dist(gen_);
 
                 std::vector<bool> marked(num_vertices_, false);
                 std::fill(idx_of_sf_edge_to.begin(), idx_of_sf_edge_to.end(), INVALID_EDGE_IDX);
@@ -96,21 +94,21 @@ namespace benchmark {
                 active.push(s);
                 marked[s] = true;
                 depth[s] = 0;
-                EdgeIdx graph_edge_idx_of_e = INVALID_EDGE_IDX;
-                bool found_e = false;
+//                EdgeIdx graph_edge_idx_of_e = INVALID_EDGE_IDX;
+                bool replaced_edge = false;
                 while (!active.empty()) {
                     const auto v = active.top();
 
-                    for (auto graph_edge_idx = first_graph_out_edge_[v]; graph_edge_idx < first_graph_out_edge_[v + 1]; ++graph_edge_idx) {
+                    for (auto graph_edge_idx = first_graph_out_edge_[v]; !replaced_edge && graph_edge_idx < first_graph_out_edge_[v + 1]; ++graph_edge_idx) {
                         const auto& e = graph_edges_[graph_edge_idx];
                         assert(e.tail == v);
                         if (marked[e.head] && !mst_contains_edge(e.tail, e.head) && !sf_contains_edge(e.tail, e.head)) {
-                            graph_edge_idx_of_e = graph_edge_idx;
-                            found_e = true;
-                            break;
+//                            graph_edge_idx_of_e = graph_edge_idx;
+
+                            replaced_edge |= check_cycle_for_replacable_edge_and_replace(graph_edge_idx, depth, idx_of_sf_edge_to, sf_edges, first_sf_out_edge);
                         }
                     }
-                    if (found_e) break;
+                    if (replaced_edge) break;
 
                     const auto next_sf_edge = first_sf_out_edge[v] + next_sf_edge_offset[v];
                     if (next_sf_edge != first_sf_out_edge[v + 1]) {
@@ -127,61 +125,66 @@ namespace benchmark {
                     }
                 }
                 assert(!active.empty());
+        }
 
-                // Attempt to find an edge e' in the cycle closed by e s.t. e' is in the original MST and w(e') < w(e)
+        bool check_cycle_for_replacable_edge_and_replace(const algen::EdgeIdx idx_of_edge_closing_cycle,
+                                                         const std::vector<algen::VertexId>& depth,
+                                                         const std::vector<algen::VertexId>& idx_of_sf_edge_to,
+                                                         algen::WEdgeList& sf_edges,
+                                                         std::vector<algen::EdgeIdx>& first_sf_out_edge) const {
+            using namespace algen;
+            // Attempt to find an edge e' in the cycle closed by e s.t. e' is in the original MST and w(e') < w(e)
 
-                // Wlog. let e.head have greater depth than e.tail. Then, all edges e' leading to e.head with
-                // depth[e'.head] > e.tail are on the cycle.
-                const WEdge& e = graph_edges_[graph_edge_idx_of_e];
-                VertexId h = e.head;
-                VertexId t = e.tail;
+            // Wlog. let e.head have greater depth than e.tail. Then, all edges e' leading to e.head with
+            // depth[e'.head] > e.tail are on the cycle.
+            const WEdge& e = graph_edges_[idx_of_edge_closing_cycle];
+            VertexId h = e.head;
+            VertexId t = e.tail;
 
-                auto check_edge = [&](const WEdge& edge){
-                    return mst_contains_edge(edge.tail, edge.head) && edge.weight < e.weight;
-                };
+            auto check_edge = [&](const WEdge& edge){
+                return mst_contains_edge(edge.tail, edge.head) && edge.weight < e.weight;
+            };
 
-                while (depth[h] > depth[e.tail]) {
-                    const auto& edge_to_h = sf_edges[idx_of_sf_edge_to[h]];
-                    if (check_edge(edge_to_h)) {
-                        replace_edge(edge_to_h, e, sf_edges, first_sf_out_edge);
-                        return;
-                    }
-                    h = edge_to_h.tail;
+            while (depth[h] > depth[e.tail]) {
+                const auto& edge_to_h = sf_edges[idx_of_sf_edge_to[h]];
+                if (check_edge(edge_to_h)) {
+                    replace_edge(edge_to_h, e, sf_edges, first_sf_out_edge);
+                    return true;
                 }
-
-                while (depth[t] > depth[e.head]) {
-                    const auto& edge_to_t = sf_edges[idx_of_sf_edge_to[t]];
-                    if (check_edge(edge_to_t)) {
-                        replace_edge(edge_to_t, e, sf_edges, first_sf_out_edge);
-                        return;
-                    }
-                    t = edge_to_t.tail;
-                }
-
-                // All edges on the path to the deepest common ancestor of e.head and e.tail are on the cycle
-                assert(depth[h] == depth[t] && depth[h] == std::min(depth[e.head], depth[e.tail]));
-                while (h != t && depth[h] > 0) {
-                    assert(depth[h] == depth[t]);
-                    const auto& edge_to_h = sf_edges[idx_of_sf_edge_to[h]];
-                    if (check_edge(edge_to_h)) {
-                        replace_edge(edge_to_h, e, sf_edges, first_sf_out_edge);
-                        return;
-                    }
-                    h = edge_to_h.tail;
-
-                    const auto& edge_to_t = sf_edges[idx_of_sf_edge_to[t]];
-                    if (check_edge(edge_to_t)) {
-                        replace_edge(edge_to_t, e, sf_edges, first_sf_out_edge);
-                        return;
-                    }
-                    t = edge_to_t.tail;
-                }
-
-                // If we reached the lowest common ancestor of e.head and e.tail in the DFS, then the cycle did not
-                // contain an edge that was suitable for e to replace. In this case, we try again with a different
-                // starting vertex.
+                h = edge_to_h.tail;
             }
 
+            while (depth[t] > depth[e.head]) {
+                const auto& edge_to_t = sf_edges[idx_of_sf_edge_to[t]];
+                if (check_edge(edge_to_t)) {
+                    replace_edge(edge_to_t, e, sf_edges, first_sf_out_edge);
+                    return true;
+                }
+                t = edge_to_t.tail;
+            }
+
+            // All edges on the path to the deepest common ancestor of e.head and e.tail are on the cycle
+            assert(depth[h] == depth[t] && depth[h] == std::min(depth[e.head], depth[e.tail]));
+            while (h != t && depth[h] > 0) {
+                assert(depth[h] == depth[t]);
+                const auto& edge_to_h = sf_edges[idx_of_sf_edge_to[h]];
+                if (check_edge(edge_to_h)) {
+                    replace_edge(edge_to_h, e, sf_edges, first_sf_out_edge);
+                    return true;
+                }
+                h = edge_to_h.tail;
+
+                const auto& edge_to_t = sf_edges[idx_of_sf_edge_to[t]];
+                if (check_edge(edge_to_t)) {
+                    replace_edge(edge_to_t, e, sf_edges, first_sf_out_edge);
+                    return true;
+                }
+                t = edge_to_t.tail;
+            }
+
+            // If we reached the lowest common ancestor of e.head and e.tail in the DFS, then the cycle did not
+            // contain an edge that was suitable for e to replace.
+            return false;
         }
 
         void replace_edge(const algen::WEdge to_remove, const algen::WEdge to_insert,
@@ -247,7 +250,7 @@ namespace benchmark {
         algen::WEdgeList msf_edges_;
         std::vector<algen::EdgeIdx> first_msf_out_edge_;
 
-        std::size_t seed_;
+        std::mt19937 gen_;
     };
 
 //    // Generates instances for an MST verification algorithm by constructing spanning trees using a depth first search.

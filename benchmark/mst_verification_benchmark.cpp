@@ -22,11 +22,12 @@ namespace {
 template<class I, class C, class V>
 void execute_benchmark(I& instrumentation, const algen::WEdgeList & graph_edge_list, const algen::WEdgeList& st_edge_list,
                        const int num_vertices, C& contender, std::size_t iterations, V& verify_response,
-                       benchmark::CsvOutput& out, std::string_view input_graph_name) {
+                       benchmark::CsvOutput& out, std::string_view input_graph_name, const int num_changed_edges) {
     for (std::size_t i = 0; i < iterations; ++i) {
 
         out.line.str("");
-        out.add(contender.name, input_graph_name, i);
+        out.add(contender.name, input_graph_name, i, num_vertices,
+                graph_edge_list.size() / 2, num_changed_edges);
 
         instrumentation.start();
         auto contender_instance = contender.factory();
@@ -61,31 +62,21 @@ static bool verify_input_list(const algen::WEdgeList& edge_list, const algen::Ve
     return correct;
 }
 
-//static algen::WEdgeList construct_st_instance(const algen::WEdgeList& graph_edges,
-//                                              const algen::WEdgeList& mst_edges,
-//                                              const algen::VertexId num_vertices,
-//                                              const std::size_t num_changed_edges) {
-//    // Construct an ST instance as input for the verification contenders by
-//    // corrupting the given MST it in num_changed_edges random places.
-//    using namespace algen;
-//    benchmark::CorruptedMSTGenerator instance_gen;
-//    static constexpr std::size_t seed = 123; // seed for RNG
-//    instance_gen.preprocess(graph_edges, mst_edges, num_vertices, seed);
-//    return instance_gen.generate_corrupted_mst(num_changed_edges, true);
-//}
+static bool verify_corrupted_mst(const algen::WEdgeList &graph_edges, const algen::WEdgeList& st_edges, const algen::VertexId num_vertices) {
+    const auto [correct, msg] = edge_list_format_check(st_edges, num_vertices);
+    if (!correct) {
+        std::cerr << "Corrupted MST edge list does not fulfill requirements: " << msg
+                  << std::endl;
+        return false;
+    }
 
-//static algen::WEdgeList construct_st_instance(const algen::WEdgeList& graph_edges,
-//                                              const algen::VertexId num_vertices,
-//                                              const std::size_t num_changed_edges,
-//                                              const bool print_status = false) {
-//    // Construct an ST instance as input for the verification contenders by computing an
-//    // MST and corrupting it in num_changed_edges random places.
-//
-//    if (print_status) std::cout << "computing MSF for generating corrupted MSTs as ST instances ... " << std::flush;
-//    auto mst_edges = fast_kruskal(graph_edges, num_vertices);
-//    if (print_status) std::cout << " done." << std::endl;
-//    construct_st_instance(graph_edges, std::move(mst_edges), num_vertices, num_changed_edges);
-//}
+    const auto [is_st, is_st_msg] = algen::is_spanning_forest(graph_edges, st_edges, num_vertices);
+    if (!is_st) {
+        std::cerr << "Corrupted MST is not a correct ST: " << msg << std::endl;
+        return false;
+    }
+    return true;
+}
 
 std::pair<bool, std::string> verify_result(const algen::WEdgeList& graph_edges,
                                            const algen::WEdgeList & tree_edges,
@@ -122,11 +113,12 @@ int main(int argc, char** argv) try {
 
     // Generate random input graph with size specified in parameters
     benchmark::GNM_Generator generator;
-    benchmark::CorruptedMSTGenerator instance_gen;
+    static constexpr std::size_t seed = 123; // seed for RNG
+    benchmark::CorruptedMSTGenerator instance_gen(seed);
     mst_verification::params::ExperimentSuite experiments;
     benchmark::TimeInstrumentation instrumentation;
     benchmark::CsvOutput output(options.output_file);
-    output.print_header(instrumentation);
+    output.print_mst_verification_header(instrumentation);
 
     WEdgeList gen_edges;
     WEdgeList mst_edges;
@@ -156,14 +148,16 @@ int main(int argc, char** argv) try {
             std::cout << "\tcomputing MSF for generating corrupted MSTs as ST instances ... " << std::flush;
             mst_edges = fast_kruskal(gen_edges, num_vertices);
             std::cout << "\t done." << std::endl;
-            static constexpr std::size_t seed = 123; // seed for RNG
-            instance_gen.preprocess(gen_edges, mst_edges, num_vertices, seed);
+            instance_gen.preprocess(gen_edges, mst_edges, num_vertices);
         }
         assert(gen_edges.size() == 2 * (1ull << log_m));
         assert(!mst_edges.empty());
 
         // Construct a spanning tree instance for the MST verification contenders on the generated input graph
         const auto corrupted_mst_edge_list = instance_gen.generate_corrupted_mst(num_changed_edges, true);
+        std::cout << "\tstart verifying that corrupted MST is ST ... " << std::flush;
+        assert(verify_corrupted_mst(gen_edges, corrupted_mst_edge_list, num_vertices));
+        std::cout << "\t done." << std::endl;
 
         // Prepare result verification
         const auto verify = [&](const std::optional<WEdge> response) -> std::pair<bool, std::string> {
@@ -178,7 +172,7 @@ int main(int argc, char** argv) try {
                 mst_verification::params::contenders, [&](auto& contender) {
                     execute_benchmark(instrumentation, gen_edges, corrupted_mst_edge_list, num_vertices,
                                       contender, options.iterations, verify,
-                                      output, generator.name());
+                                      output, generator.name(), num_changed_edges);
                 });
     }
 

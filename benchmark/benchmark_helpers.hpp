@@ -53,17 +53,32 @@ struct CsvOutput {
           line.precision(3);
       }
 
+      template<class I>
+      void print_mst_construction_header(const I& instr) {
+          const std::vector<std::string> config_column_names = {"contender", "input_graph", "iteration", "num_vertices", "num_edges"};
+          print_header(config_column_names, instr);
+      }
+
+    template<class I>
+    void print_mst_verification_header(const I& instr) {
+        const std::vector<std::string> config_column_names = {"contender", "input_graph", "iteration", "num_vertices", "num_edges", "num_changed_edges"};
+        print_header(config_column_names, instr);
+    }
+
       template <class I>
-      void print_header(const I& instr) {
+      void print_header(const std::vector<std::string>& config_column_names, const I& instr) {
           line.str("");
-          line << "contender, input_graph, iteration, num_vertices, num_edges";
+          for (const auto& column_name : config_column_names)
+              line << column_name << ", ";
           for (auto m : instr)
-              line << ", factory_" << m.key;
+              line << "factory_" << m.key << ", ";
           for (auto m : instr)
-              line << ", execution_" << m.key;
-          line << ", result_correct\n";
+              line << "execution_" << m.key << ", ";
+          line << "result_correct\n";
           file << line.str();
       }
+
+
 
       template <class... Ts>
       void add(Ts... fields) {
