@@ -73,7 +73,7 @@ of namespaces all together.)
 ## Plots
 You find some suggestions/help for plots in <code>plots</code>. You can execute the plotting scripts as follows:
 ``` shell
-Rscript ./evaluation_mst_construction.r --infile <path to .csv file> --outfile <name of pdf file with plots>
+Rscript ./evaluation_mst_[construction,verification].r --infile <path to .csv file> --outfile <name of pdf file with plots>
 ```
 
 ## Submission of your code
