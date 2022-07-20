@@ -79,3 +79,13 @@ Rscript ./evaluation_mst_[construction,verification].r --infile <path to .csv fi
 ## Submission of your code
 To submit the final version of your project (deadline will be at the beginning of september) you can simply send us a link to the repository (on github, scc-gitlab, etc.) into which you have forked this framework + the final commit hash/release via email.
 
+
+## Report
+Next to your implementation, you are required to hand in a short report on the engineering measures you undertook to achieve an efficient implementation. You need to describe only your implementation, not the base algorithm itself. The report should meet the following requirements:
+* About one A4 page of text (in German or English) in full sentences describing your means for an efficient code. This should also include variants, parameter values or ideas that did not prove to lead to an improvement (negative results are also important results!). 
+* At least three plots that support the claims on the performance of your code. These can also include results for variants of your code that perform worse than others. Make sure your plots are concise and meaningful. Make reference to and interpret the plots in your text.
+* You can use any text processing tool to assemble your report with the following requirements on formatting:
+    * Any reasonably legible (and professional looking) font in font size 11 or 12
+    * Line spacing <= 1.5x
+    * Hand in the report as PDF
+* You may write more than one page of text and show more than three plots but keep your report to the point. Bloated, imprecise texts are discouraged. 
