@@ -83,7 +83,7 @@ To submit the final version of your project (deadline will be at the beginning o
 ## Report
 Next to your implementation, you are required to hand in a short report on the engineering measures you undertook to achieve an efficient implementation. You need to describe only your implementation, not the base algorithm itself. The report should meet the following requirements:
 * About one A4 page of text (in German or English) in full sentences describing your means for an efficient code. This should also include variants, parameter values or ideas that did not prove to lead to an improvement (negative results are also important results!). 
-* At least three plots that support the claims on the performance of your code. These can also include results for variants of your code that perform worse than others. Make sure your plots are concise and meaningful. Make reference to and interpret the plots in your text.
+* At least three plots that support the claims on the performance of your code. These can also include results for variants of your code that perform worse than others. Make sure your plots are concise and meaningful. Make reference to and interpret the plots in your text. (The plots don't count into the suggested text length of one A4 page, you may display the plots as large as necessary.)
 * You can use any text processing tool to assemble your report with the following requirements on formatting:
     * Any reasonably legible (and professional looking) font in font size 11 or 12
     * Line spacing <= 1.5x
