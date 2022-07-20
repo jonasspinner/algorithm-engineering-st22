@@ -38,9 +38,14 @@ void execute_benchmark(I& instrumentation, const algen::WEdgeList& edge_list,
     for (auto m : instrumentation) out.add(m.value);
 
     instrumentation.start();
+    REORDERING_BARRIER
     auto mst_edges = contender_instance(edge_list, num_vertices);
+    REORDERING_BARRIER
     instrumentation.stop();
-    for (auto m : instrumentation) out.add(m.value);
+
+    auto& classifier = algen::getEdgeClassifier();
+    for (auto m : instrumentation) out.add(m.value - classifier.get_time_in_nanoseconds());
+    classifier.reset();
 
     auto [correct, msg] = verify(mst_edges);
     if (correct) {

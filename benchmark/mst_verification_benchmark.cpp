@@ -36,7 +36,9 @@ void execute_benchmark(I& instrumentation, const algen::WEdgeList & graph_edge_l
             out.add(m.value);
 
         instrumentation.start();
+        REORDERING_BARRIER
         std::optional<algen::WEdge> response = contender_instance(graph_edge_list, st_edge_list, num_vertices);
+        REORDERING_BARRIER
         instrumentation.stop();
         for (auto m : instrumentation)
             out.add(m.value);
