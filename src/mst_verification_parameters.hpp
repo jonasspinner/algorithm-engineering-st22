@@ -82,7 +82,7 @@ namespace mst_verification {
 
         struct ExperimentSuite {
             std::size_t log_n_begin = 14;
-            std::size_t log_n_end = 17;
+            std::size_t log_n_end = 19;
             std::size_t edge_factor_begin = 1;
             std::size_t edge_factor_end = 256;
             bool try_yes_instances = true;
