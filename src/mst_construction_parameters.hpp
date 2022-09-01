@@ -4,6 +4,7 @@
 #include "includes/binary_includes.hpp"
 #include "naive_jarnik_prim.hpp"
 #include "naive_kruskal.hpp"
+#include "expected_linear_time_mst.hpp"
 
 namespace mst_construction {
 namespace params {
@@ -32,6 +33,9 @@ Contender(std::string_view, F) -> Contender<F>;
 
 // Register your contenders in this tuple:
 constexpr std::tuple contenders{
+    Contender{"expected_linear_time_mst",
+              [] { return js::ExpectedLinearTimeMST(); }},
+
     // Some examples:
 
     // Slow kruskal, deactivate for larger graphs (log_m > 16)
