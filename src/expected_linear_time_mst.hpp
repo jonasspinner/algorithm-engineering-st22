@@ -3,6 +3,7 @@
 #include <utility>
 #include <random>
 #include <algorithm>
+#include <iomanip>
 
 #include "includes/definitions.hpp"
 #include "includes/utils.hpp"
@@ -13,29 +14,28 @@
 #include "datastructures/fast_reset_bitvector.hpp"
 
 namespace js {
-    template<typename T>
-    void hash_combine(std::size_t &seed, T const &v) {
-        // The Boost Software License, Version 1.0 applies to this function.
-        // See https://www.boost.org/LICENSE_1_0.txt
-        // https://www.boost.org/doc/libs/1_75_0/doc/html/hash/reference.html#boost.hash_combine
-        seed ^= std::hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    }
-
-    struct PairHash {
-        template<typename A, typename B>
-        std::size_t operator()(const std::pair<A, B> &pair) const {
-            std::size_t seed = 0;
-            hash_combine(seed, pair.first);
-            hash_combine(seed, pair.second);
-            return seed;
-        }
-    };
-
-
     class ExpectedLinearTimeMST {
         using i64 = int64_t;
         using u64 = uint64_t;
+        using u32 = uint32_t;
+        using VertexId = algen::VertexId;
+        using EdgeIdx = algen::EdgeIdx;
+        using Weight = algen::Weight;
+        static constexpr VertexId VERTEXID_UNDEFINED = algen::VERTEXID_UNDEFINED;
+
+        static constexpr bool LOG_INFO = true;
+
+        struct PairHash {
+            template<typename A, typename B>
+            std::size_t operator()(const std::pair<A, B> &pair) const {
+                return std::hash<A>{}(pair.first) << 32 ^ std::hash<B>{}(pair.second);
+            }
+        };
+
     public:
+
+        explicit ExpectedLinearTimeMST(size_t num_boruvka_phases = 3) : m_num_boruvka_phases(num_boruvka_phases) {}
+
         algen::WEdgeList operator()(const algen::WEdgeList &edge_list,
                                     const algen::VertexId num_vertices) {
             using namespace algen;
@@ -50,7 +50,7 @@ namespace js {
             mst.reserve(num_vertices - 1);
 
             m_cheapest_edges_scratchpad.resize(G.num_nodes, INVALID_CONTRACTED_EDGE);
-            m_active_nodes_scratchpad.reserve(G.num_nodes / 2);
+            m_active_nodes_scratchpad.reserve((size_t) (0.27 * (double) G.num_nodes));
 
             algorithm(std::move(G), mst);
 
@@ -59,16 +59,21 @@ namespace js {
 
     private:
         struct ContractedEdge {
-            u64 a;
-            u64 b;
-            u64 u;
-            u64 v;
-            algen::Weight weight;
+            VertexId a;
+            VertexId b;
+            VertexId u;
+            VertexId v;
+            Weight weight;
 
             friend std::ostream &operator<<(std::ostream &os, const ContractedEdge &edge) {
                 return os << "(" << edge.a << "," << edge.b << ") " << algen::WEdge{edge.u, edge.v, edge.weight};
             }
         };
+
+        static_assert(std::is_trivially_constructible_v<ContractedEdge>);
+        static_assert(std::is_trivially_destructible_v<ContractedEdge>);
+        static_assert(std::is_trivially_constructible_v<algen::WEdge>);
+        static_assert(std::is_trivially_destructible_v<algen::WEdge>);
 
         static constexpr ContractedEdge INVALID_CONTRACTED_EDGE = {
                 algen::VERTEXID_UNDEFINED,
@@ -94,90 +99,59 @@ namespace js {
                 return G;
             }
 
-            [[nodiscard]] bool check() const {
-                std::unordered_map<std::pair<u64, u64>, std::pair<algen::WEdge, u64>, PairHash> inter_cluster_edges;
-                for (auto [a, b, u, v, w]: edges) {
-                    if (a == b) {
-                        assert(false);
-                        return false;
-                    }
-                    if (a > b) {
-                        std::swap(a, b);
-                        std::swap(u, v);
-                    }
-                    auto [it, inserted] = inter_cluster_edges.insert({{a,         b},
-                                                                      {{u, v, w}, 1}});
-                    if (!inserted) {
-                        auto [a_, b_] = it->first;
-                        auto [edge_, count] = it->second;
-                        auto [u_, v_, w_] = edge_;
-                        if (a_ > b_) {
-                            std::swap(a_, b_);
-                            std::swap(u_, v_);
-                        }
-                        if (count != 1) {
-                            assert(false);
-                            return false;
-                        }
-                        if (!(a == a_ && b == b_ && u == u_ && v == v_ && w == w_)) {
-                            assert(false);
-                            return false;
-                        }
-                        it->second.second++;
-                    }
-                }
-                return true;
-            }
-
             void compress(UnionFind<algen::VertexId> &union_find) {
-                std::vector<u64> cc_ids(num_nodes, 0);
-                u64 current_id = 0;
-                for (u64 u = 0; u < num_nodes; ++u) {
-                    if (union_find.find(u) == u && !union_find.is_singleton(u)) {
-                        cc_ids[u] = current_id;
-                        current_id++;
-                    }
-                }
+                robin_hood::unordered_map<VertexId, VertexId> new_vertex_ids;
 
-                auto num_clusters = current_id;
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (1. - (double) num_clusters / (double) num_nodes) << "% ("
-                          << std::setw(8) << num_nodes - num_clusters << "/"
-                          << std::setw(8) << num_nodes << ") of nodes removed by compression\n";
+                auto new_num_nodes = 0;
 
-                num_nodes = num_clusters;
+                auto get_mapped_vertex_id = [&](VertexId u) -> VertexId {
+                    assert(union_find.is_non_singleton_representative(u));
+                    auto [it, inserted] = new_vertex_ids.try_emplace(u, new_num_nodes);
+                    new_num_nodes += inserted ? 1 : 0;
+                    return it->second;
+                };
 
+                robin_hood::unordered_map<std::pair<VertexId, VertexId>, algen::WEdge, PairHash> inter_cluster_edges;
 
-                robin_hood::unordered_map<std::pair<u64, u64>, algen::WEdge, PairHash> inter_cluster_edges;
-                inter_cluster_edges.reserve(num_nodes);
+                for (auto [a, b, u, v, w]: edges) {
+                    a = union_find.find(a);
+                    b = union_find.find(b);
+                    if (a != b) {
+                        assert(a == union_find.find(a));
+                        assert(b == union_find.find(b));
+                        assert(a != b);
 
-                for (auto &edge: edges) {
-                    edge.a = union_find.find(edge.a);
-                    edge.b = union_find.find(edge.b);
-                    if (edge.a != edge.b) {
-                        edge.a = cc_ids[edge.a];
-                        edge.b = cc_ids[edge.b];
+                        a = get_mapped_vertex_id(a);
+                        b = get_mapped_vertex_id(b);
 
-                        if (edge.a > edge.b) {
-                            std::swap(edge.a, edge.b);
-                        }
-                        assert(edge.a != edge.b);
-                        assert(edge.a < num_nodes);
-                        assert(edge.b < num_nodes);
-                        algen::WEdge uvw = {edge.u, edge.v, edge.weight};
-                        auto [it, inserted] = inter_cluster_edges.emplace(std::pair{edge.a, edge.b}, uvw);
+                        if (a > b) std::swap(a, b);
+                        assert(a != b);
+                        assert(a < num_nodes);
+                        assert(b < num_nodes);
+                        algen::WEdge uvw = {u, v, w};
+                        auto [it, inserted] = inter_cluster_edges.emplace(std::pair{a, b}, uvw);
                         if (!inserted) {
-                            if (edge.weight < it->second.weight) {
+                            if (w < it->second.weight) {
                                 it->second = uvw;
                             }
                         }
                     }
                 }
 
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (1. - (2. * (double) inter_cluster_edges.size()) / (double) edges.size()) << "% ("
-                          << std::setw(8) << edges.size() / 2 - inter_cluster_edges.size() << "/"
-                          << std::setw(8) << edges.size() / 2 << ") of edges removed as multi edges\n";
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (1. - (double) new_num_nodes / (double) num_nodes) << "% ("
+                              << std::setw(8) << num_nodes - new_num_nodes << "/"
+                              << std::setw(8) << num_nodes << ") of nodes removed by compression\n";
+
+                num_nodes = new_num_nodes;
+
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (1. - (2. * (double) inter_cluster_edges.size()) / (double) edges.size())
+                              << "% ("
+                              << std::setw(8) << edges.size() / 2 - inter_cluster_edges.size() << "/"
+                              << std::setw(8) << edges.size() / 2 << ") of edges removed as multi edges\n";
 
                 edges.clear();
                 edges.reserve(2 * inter_cluster_edges.size());
@@ -203,34 +177,48 @@ namespace js {
 
             void remove_heavy_edges(const std::vector<bool> &is_light_edge) {
                 assert(is_light_edge.size() == edges.size());
+
                 i64 last = 0;
                 for (size_t i = 0; i < edges.size(); i++) {
-                    if (is_light_edge[i]) {
-                        edges[last++] = edges[i];
-                    }
+                    edges[last] = edges[i];
+                    last += is_light_edge[i] ? 1 : 0;
                 }
+
                 assert(last % 2 == 0);
                 assert(is_light_edge.size() % 2 == 0);
                 assert(edges.size() % 2 == 0);
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (1. - ((double) last) / (double) edges.size()) << "% ("
-                          << std::setw(8) << (edges.size() - last) / 2 << "/"
-                          << std::setw(8) << edges.size() / 2 << ") of edges removed as heavy\n";
+
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (1. - ((double) last) / (double) edges.size()) << "% ("
+                              << std::setw(8) << (edges.size() - last) / 2 << "/"
+                              << std::setw(8) << edges.size() / 2 << ") of edges removed as heavy\n";
+
                 edges.erase(edges.begin() + last, edges.end());
             }
 
-            [[nodiscard]] ContractedEdgeListGraph get_subgraph_sample(std::mt19937_64 &gen) const {
+            [[nodiscard]] ContractedEdgeListGraph get_subgraph_sample(std::minstd_rand &gen) const {
                 ContractedEdgeListGraph H;
                 H.edges.reserve((size_t) (0.52 * (double) edges.size()));
                 H.num_nodes = num_nodes;
 
-                std::bernoulli_distribution dist;
+                std::uniform_int_distribution<u32> dist(0, std::numeric_limits<u32>::max());
+                u32 r = dist(gen);
+                int rw = 32;
+
                 for (auto [a, b, _u, _v, w]: edges) {
                     // Make sure that the edge list H is symmetric, by ignoring edges with a > b and producing the edges
                     // in both directions if an edge with a < b is sampled.
-                    if (a < b && dist(gen)) {
-                        H.edges.push_back({a, b, a, b, w});
-                        H.edges.push_back({b, a, b, a, w});
+                    if (a < b) {
+                        if ((r & 1) != 0) {
+                            H.edges.push_back({a, b, a, b, w});
+                            H.edges.push_back({b, a, b, a, w});
+                        }
+                        r >>= 1;
+                        rw = (rw + 1) & 31;
+                        if (rw == 0) {
+                            r = dist(gen);
+                        }
                     }
                 }
                 return H;
@@ -249,13 +237,14 @@ namespace js {
             }
 
             // 2. Create a contracted graph G' by running two successive Borůvka steps on G
-            UnionFind<u64> union_find(G.num_nodes);
+            auto &union_find = m_union_find_scratchpad;
+            union_find.reset(G.num_nodes);
 
             //for (int i = 0; i < 3; ++i) {
             //    G = boruvka_step(std::move(G), union_find, mst);
             //    if (G.edges.empty()) return;
             //}
-            auto G_prime = boruvka_steps(3, std::move(G), union_find, mst);
+            auto G_prime = boruvka_steps(5, std::move(G), union_find, mst);
             if (G_prime.edges.empty()) return;
 
             G_prime.compress(union_find);
@@ -290,67 +279,6 @@ namespace js {
         }
 
         ContractedEdgeListGraph
-        boruvka_step(ContractedEdgeListGraph &&G, UnionFind<algen::VertexId> &union_find, algen::WEdgeList &mst) {
-            auto &cheapest_edges = m_cheapest_edges_scratchpad;
-            assert(G.num_nodes == union_find.num_elements());
-            assert(G.num_nodes <= cheapest_edges.size());
-
-            auto is_better = [](const ContractedEdge &lhs, const ContractedEdge &rhs) {
-                assert(rhs.weight == algen::WEIGHT_UNDEFINED || lhs.a == rhs.a);
-                return std::tie(lhs.weight, lhs.b) < std::tie(rhs.weight, rhs.b);
-            };
-
-            for (auto &edge: G.edges) {
-                auto &[a, b, _u, _v, _w] = edge;
-
-                assert(a != b);
-                assert(union_find.find(a) == a);
-                assert(union_find.find(b) == b);
-
-                if (is_better(edge, cheapest_edges[edge.a])) {
-                    cheapest_edges[edge.a] = edge;
-                }
-            }
-
-            u64 count = 0;
-            for (u64 node = 0; node < G.num_nodes; ++node) {
-                if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
-                    auto &[a, b, u, v, w] = cheapest_edges[node];
-                    if (union_find.do_union(a, b)) {
-                        mst.emplace_back(u, v, w);
-                        mst.emplace_back(v, u, w);
-                    }
-                    cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
-                } else {
-                    count++;
-                }
-            }
-            std::cout << std::setprecision(4) << std::setw(5) << 100. * (((double) count) / (double) G.num_nodes)
-                      << "% ("
-                      << std::setw(8) << (count) << "/"
-                      << std::setw(8) << G.num_nodes << ") of nodes do not have a cheapest edge\n";
-
-            i64 last = 0;
-            for (size_t i = 0; i < G.edges.size(); i++) {
-                auto &edge = G.edges[i];
-                auto &[a, b, _u, _v, _w] = edge;
-                a = union_find.find(a);
-                b = union_find.find(b);
-                if (G.edges[i].a != G.edges[i].b) {
-                    G.edges[last++] = edge;
-                }
-            }
-            std::cout << std::setprecision(4) << std::setw(5) << 100. * (1. - ((double) last) / (double) G.edges.size())
-                      << "% ("
-                      << std::setw(8) << (G.edges.size() - last) / 2 << "/"
-                      << std::setw(8) << G.edges.size() / 2 << ") of edges removed as intra cluster edges\n";
-
-            G.edges.erase(G.edges.begin() + last, G.edges.end());
-
-            return G;
-        }
-
-        ContractedEdgeListGraph
         boruvka_steps(int num_steps, ContractedEdgeListGraph &&G, UnionFind<algen::VertexId> &union_find,
                       algen::WEdgeList &mst) {
             auto &cheapest_edges = m_cheapest_edges_scratchpad;
@@ -360,7 +288,7 @@ namespace js {
             assert(G.num_nodes == union_find.num_elements());
             assert(G.num_nodes <= cheapest_edges.size());
 
-            auto is_better = [](const ContractedEdge &lhs, const ContractedEdge &rhs) {
+            constexpr auto is_better = [](const ContractedEdge &lhs, const ContractedEdge &rhs) constexpr noexcept {
                 assert(rhs.weight == algen::WEIGHT_UNDEFINED || lhs.a == rhs.a);
                 return std::tie(lhs.weight, lhs.b) < std::tie(rhs.weight, rhs.b);
             };
@@ -368,7 +296,7 @@ namespace js {
             /*
              * Call f for all inter cluster edges. Remove all intra cluster edges.
              */
-            auto filter_and_map_edges = [&](auto f) {
+            auto filter_and_map_edges = [&](auto f) constexpr noexcept {
                 i64 last = 0;
                 for (size_t i = 0; i < G.edges.size(); i++) {
                     auto &edge = G.edges[i];
@@ -382,11 +310,12 @@ namespace js {
                     }
                 }
 
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (1. - ((double) last) / (double) G.edges.size()) << "% ("
-                          << std::setw(8) << (G.edges.size() - last) / 2 << "/"
-                          << std::setw(8) << G.edges.size() / 2 << ") of edges removed as intra cluster edges"
-                          << "\n";
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (1. - ((double) last) / (double) G.edges.size()) << "% ("
+                              << std::setw(8) << (G.edges.size() - last) / 2 << "/"
+                              << std::setw(8) << G.edges.size() / 2 << ") of edges removed as intra cluster edges"
+                              << "\n";
 
                 G.edges.erase(G.edges.begin() + last, G.edges.end());
             };
@@ -394,9 +323,9 @@ namespace js {
             /*
              * Call f for all nodes which have an edge.
              */
-            auto map_all_nodes = [&](auto f) {
-                u64 count = 0;
-                for (u64 node = 0; node < G.num_nodes; ++node) {
+            auto map_all_nodes = [&](auto f) constexpr noexcept {
+                size_t count = 0;
+                for (VertexId node = 0; node < G.num_nodes; ++node) {
                     if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
                         f(node);
                         cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
@@ -404,35 +333,39 @@ namespace js {
                         count++;
                     }
                 }
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * ((double) (G.num_nodes - count) / (double) G.num_nodes)
-                          << "% ("
-                          << std::setw(8) << (G.num_nodes - count) << "/"
-                          << std::setw(8) << G.num_nodes << ") of nodes were active\n";
+
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * ((double) (G.num_nodes - count) / (double) G.num_nodes)
+                              << "% ("
+                              << std::setw(8) << (G.num_nodes - count) << "/"
+                              << std::setw(8) << G.num_nodes << ") of nodes were active\n";
             };
 
             /*
              * Call f for all nodes which have an edge and populate the active_nodes vector with them.
              */
-            auto map_all_nodes_and_set_active = [&](auto f) {
-                for (u64 node = 0; node < G.num_nodes; ++node) {
+            auto map_all_nodes_and_set_active = [&](auto f) constexpr noexcept {
+                for (VertexId node = 0; node < G.num_nodes; ++node) {
                     if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
                         f(node);
                         active_nodes.push_back(node);
                         cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
                     }
                 }
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (((double) active_nodes.size()) / (double) G.num_nodes)
-                          << "% ("
-                          << std::setw(8) << active_nodes.size() << "/"
-                          << std::setw(8) << G.num_nodes << ") of nodes were active\n";
+
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (((double) active_nodes.size()) / (double) G.num_nodes)
+                              << "% ("
+                              << std::setw(8) << active_nodes.size() << "/"
+                              << std::setw(8) << G.num_nodes << ") of nodes were active\n";
             };
 
             /*
              * Call f for all nodes which have an edge. Remove all other nodes from active_nodes.
              */
-            auto filter_and_map_active_nodes = [&](auto f) {
+            auto filter_and_map_active_nodes = [&](auto f) constexpr noexcept {
                 long long last = 0;
                 for (u64 l = 0; l < active_nodes.size(); ++l) {
                     auto node = active_nodes[l];
@@ -442,11 +375,13 @@ namespace js {
                         cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
                     }
                 }
-                std::cout << std::setprecision(4) << std::setw(5)
-                          << 100. * (((double) last) / (double) active_nodes.size())
-                          << "% ("
-                          << std::setw(8) << (last) << "/"
-                          << std::setw(8) << active_nodes.size() << ") of nodes were active\n";
+
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * (((double) last) / (double) active_nodes.size())
+                              << "% ("
+                              << std::setw(8) << (last) << "/"
+                              << std::setw(8) << active_nodes.size() << ") of nodes were active\n";
 
                 active_nodes.erase(active_nodes.begin() + last, active_nodes.end());
             };
@@ -459,7 +394,7 @@ namespace js {
                 }
             }
 
-            map_all_nodes([&](auto node) {
+            map_all_nodes([&](auto node) constexpr noexcept {
                 auto &[a, b, u, v, w] = cheapest_edges[node];
                 if (union_find.do_union(a, b)) {
                     mst.emplace_back(u, v, w);
@@ -469,14 +404,14 @@ namespace js {
 
 
             // Intra cluster edge filtering and cheapest edge selection.
-            filter_and_map_edges([&](const auto &edge) {
+            filter_and_map_edges([&](const auto &edge) constexpr noexcept {
                 if (is_better(edge, cheapest_edges[edge.a])) {
                     cheapest_edges[edge.a] = edge;
                 }
             });
             if (G.edges.empty()) return G;
 
-            map_all_nodes_and_set_active([&](auto node) {
+            map_all_nodes_and_set_active([&](auto node) constexpr noexcept {
                 auto &[a, b, u, v, w] = cheapest_edges[node];
                 if (union_find.do_union(a, b)) {
                     mst.emplace_back(u, v, w);
@@ -493,7 +428,7 @@ namespace js {
                 });
                 if (G.edges.empty()) return G;
 
-                filter_and_map_active_nodes([&](auto node) {
+                filter_and_map_active_nodes([&](auto node) noexcept {
                     auto &[a, b, u, v, w] = cheapest_edges[node];
                     if (union_find.do_union(a, b)) {
                         mst.emplace_back(u, v, w);
@@ -502,15 +437,16 @@ namespace js {
                 });
             }
 
-            //filter_and_map_edges([](const auto&){});
-
             return G;
         }
 
-        std::mt19937_64 m_gen;
+        std::minstd_rand m_gen;
 
+        size_t m_num_boruvka_phases;
+
+        UnionFind<VertexId> m_union_find_scratchpad;
         std::vector<ContractedEdge> m_cheapest_edges_scratchpad;
-        std::vector<u64> m_active_nodes_scratchpad;
+        std::vector<VertexId> m_active_nodes_scratchpad;
     };
 
 }
