@@ -12,7 +12,8 @@ namespace js {
     public:
         UnionFind() = default;
 
-        explicit UnionFind(T num_elements) : m_parents_ranks(num_elements, num_elements), m_num_representatives(num_elements) {}
+        explicit UnionFind(T num_elements) : m_parents_ranks(num_elements, num_elements),
+                                             m_num_representatives(num_elements) {}
 
         void reset(T num_elements) {
             m_parents_ranks.clear();
@@ -42,11 +43,12 @@ namespace js {
 
             auto rank_a = m_parents_ranks[a];
             auto rank_b = m_parents_ranks[b];
-            if (rank_a > rank_b) std::swap(a, b);
-            m_parents_ranks[a] = b;
 
-            if (rank_a == rank_b) {
-                m_parents_ranks[b]++;
+            if (rank_a < rank_b) {
+                m_parents_ranks[a] = b;
+            } else {
+                m_parents_ranks[b] = a;
+                m_parents_ranks[a] += rank_a == rank_b ? 1 : 0;
             }
             return true;
         }

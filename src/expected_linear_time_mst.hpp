@@ -23,7 +23,7 @@ namespace js {
         using Weight = algen::Weight;
         static constexpr VertexId VERTEXID_UNDEFINED = algen::VERTEXID_UNDEFINED;
 
-        static constexpr bool LOG_INFO = true;
+        static constexpr bool LOG_INFO = false;
 
         struct PairHash {
             template<typename A, typename B>
@@ -34,16 +34,12 @@ namespace js {
 
     public:
 
-        explicit ExpectedLinearTimeMST(size_t num_boruvka_phases = 3) : m_num_boruvka_phases(num_boruvka_phases) {}
+        explicit ExpectedLinearTimeMST(size_t num_boruvka_phases = 3) : m_gen(std::random_device{}()),
+                                                                        m_num_boruvka_phases(num_boruvka_phases) {}
 
         algen::WEdgeList operator()(const algen::WEdgeList &edge_list,
                                     const algen::VertexId num_vertices) {
             using namespace algen;
-
-            std::random_device rd;
-            std::uniform_int_distribution<size_t> seed_dist;
-            m_gen.seed(seed_dist(rd));
-            //m_gen.seed(0);
 
             auto G = ContractedEdgeListGraph::from_algen_edge_list(edge_list, num_vertices);
             algen::WEdgeList mst;
@@ -101,6 +97,7 @@ namespace js {
 
             void compress(UnionFind<algen::VertexId> &union_find) {
                 robin_hood::unordered_map<VertexId, VertexId> new_vertex_ids;
+                new_vertex_ids.reserve(64);
 
                 auto new_num_nodes = 0;
 
@@ -112,6 +109,7 @@ namespace js {
                 };
 
                 robin_hood::unordered_map<std::pair<VertexId, VertexId>, algen::WEdge, PairHash> inter_cluster_edges;
+                inter_cluster_edges.reserve(64);
 
                 for (auto [a, b, u, v, w]: edges) {
                     a = union_find.find(a);
@@ -151,7 +149,8 @@ namespace js {
                               << 100. * (1. - (2. * (double) inter_cluster_edges.size()) / (double) edges.size())
                               << "% ("
                               << std::setw(8) << edges.size() / 2 - inter_cluster_edges.size() << "/"
-                              << std::setw(8) << edges.size() / 2 << ") of edges removed as multi edges\n";
+                              << std::setw(8) << edges.size() / 2
+                              << ") of edges removed as intra cluster and multi edges\n";
 
                 edges.clear();
                 edges.reserve(2 * inter_cluster_edges.size());
@@ -198,13 +197,20 @@ namespace js {
             }
 
             [[nodiscard]] ContractedEdgeListGraph get_subgraph_sample(std::minstd_rand &gen) const {
+                auto t0 = std::chrono::steady_clock::now();
                 ContractedEdgeListGraph H;
                 H.edges.reserve((size_t) (0.52 * (double) edges.size()));
                 H.num_nodes = num_nodes;
 
-                std::uniform_int_distribution<u32> dist(0, std::numeric_limits<u32>::max());
-                u32 r = dist(gen);
-                int rw = 32;
+                std::uniform_int_distribution<u64> dist(0, std::numeric_limits<u64>::max());
+                u64 r = dist(gen);
+                int rw = 64;
+
+                // Note: branchless version with
+                // unconditioned writing to H.edges[last] and H.edges[last+1],
+                // advancing last by 2 * ((a < b ? 1 : 0) & (r & 1)) and
+                // doing 64 iterations until r = dist(gen)
+                // was not faster than branching version.
 
                 for (auto [a, b, _u, _v, w]: edges) {
                     // Make sure that the edge list H is symmetric, by ignoring edges with a > b and producing the edges
@@ -215,7 +221,7 @@ namespace js {
                             H.edges.push_back({b, a, b, a, w});
                         }
                         r >>= 1;
-                        rw = (rw + 1) & 31;
+                        rw = (rw + 1) & 63;
                         if (rw == 0) {
                             r = dist(gen);
                         }
@@ -226,35 +232,31 @@ namespace js {
         };
 
         void algorithm(ContractedEdgeListGraph &&G, algen::WEdgeList &mst, size_t level = 0) {
-            std::cout << "level=" << level << "\n";
+            if constexpr (LOG_INFO)
+                std::cout << "level=" << level << "\n";
 
-            // 1. If G is empty return an empty forest
-            if (G.edges.size() <= 4) {
-                for (const auto &edge: G.edges) {
-                    mst.emplace_back(edge.u, edge.v, edge.weight);
+            // 1. If G has at most 2 edges return all edges as forest
+            auto tiny_graph_mst = [](const auto &G, auto &mst) {
+                if (G.edges.size() <= 4) {
+                    for (const auto &edge: G.edges) {
+                        mst.emplace_back(edge.u, edge.v, edge.weight);
+                    }
+                    return true;
                 }
-                return;
-            }
+                return false;
+            };
+            if (tiny_graph_mst(G, mst)) return;
 
-            // 2. Create a contracted graph G' by running two successive Borůvka steps on G
+            // 2. Create a contracted graph G' by running three successive Borůvka steps on G
             auto &union_find = m_union_find_scratchpad;
             union_find.reset(G.num_nodes);
 
-            //for (int i = 0; i < 3; ++i) {
-            //    G = boruvka_step(std::move(G), union_find, mst);
-            //    if (G.edges.empty()) return;
-            //}
-            auto G_prime = boruvka_steps(5, std::move(G), union_find, mst);
+            auto G_prime = boruvka_steps(m_num_boruvka_phases, std::move(G), union_find, mst);
             if (G_prime.edges.empty()) return;
 
             G_prime.compress(union_find);
 
-            if (G_prime.edges.size() <= 4) {
-                for (const auto &edge: G_prime.edges) {
-                    mst.emplace_back(edge.u, edge.v, edge.weight);
-                }
-                return;
-            }
+            if (tiny_graph_mst(G_prime, mst)) return;
 
             // 3. Create a subgraph H by selecting each edge in G' with probability 1/2. Recursively apply the algorithm to H to get its minimum spanning forest F.
             auto H = G_prime.get_subgraph_sample(m_gen);
@@ -321,7 +323,7 @@ namespace js {
             };
 
             /*
-             * Call f for all nodes which have an edge.
+             * Call f for all nodes which have at least one incident edge.
              */
             auto map_all_nodes = [&](auto f) constexpr noexcept {
                 size_t count = 0;
@@ -329,7 +331,7 @@ namespace js {
                     if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
                         f(node);
                         cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
-                    } else {
+                    } else if constexpr (LOG_INFO) {
                         count++;
                     }
                 }
@@ -343,7 +345,7 @@ namespace js {
             };
 
             /*
-             * Call f for all nodes which have an edge and populate the active_nodes vector with them.
+             * Call f for all nodes which have at least one incident edge and populate the active_nodes vector with them.
              */
             auto map_all_nodes_and_set_active = [&](auto f) constexpr noexcept {
                 for (VertexId node = 0; node < G.num_nodes; ++node) {
@@ -363,12 +365,12 @@ namespace js {
             };
 
             /*
-             * Call f for all nodes which have an edge. Remove all other nodes from active_nodes.
+             * Call f for all nodes which have at least one incident edge. Remove all other nodes from active_nodes.
              */
             auto filter_and_map_active_nodes = [&](auto f) constexpr noexcept {
-                long long last = 0;
-                for (u64 l = 0; l < active_nodes.size(); ++l) {
-                    auto node = active_nodes[l];
+                size_t last = 0;
+                for (size_t i = 0; i < active_nodes.size(); ++i) {
+                    auto node = active_nodes[i];
                     if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
                         active_nodes[last++] = node;
                         f(node);
@@ -386,14 +388,40 @@ namespace js {
                 active_nodes.erase(active_nodes.begin() + last, active_nodes.end());
             };
 
+            /*
+             * Call f for all nodes which have at least one incident edge. Don't update active_nodes.
+             */
+            auto map_active_nodes = [&](auto f) constexpr noexcept {
+                size_t count = 0;
+                for (auto node: active_nodes) {
+                    if (cheapest_edges[node].weight != algen::WEIGHT_UNDEFINED) {
+                        f(node);
+                        cheapest_edges[node].weight = algen::WEIGHT_UNDEFINED;
+                    } else if constexpr (LOG_INFO) {
+                        count++;
+                    }
+                }
 
-            // Cheapest edge selection.
+                if constexpr (LOG_INFO)
+                    std::cout << std::setprecision(4) << std::setw(5)
+                              << 100. * ((double) (active_nodes.size() - count) / (double) active_nodes.size())
+                              << "% ("
+                              << std::setw(8) << (active_nodes.size() - count) << "/"
+                              << std::setw(8) << active_nodes.size() << ") of nodes were active\n";
+            };
+
+
+            // First Boruvka Step
+
+            // Cheapest edge selection
+            // All edges are guaranteed to be inter-cluster edges
             for (auto &edge: G.edges) {
                 if (is_better(edge, cheapest_edges[edge.a])) {
                     cheapest_edges[edge.a] = edge;
                 }
             }
 
+            // Nearly all nodes have at least one incident edge for most input graphs
             map_all_nodes([&](auto node) constexpr noexcept {
                 auto &[a, b, u, v, w] = cheapest_edges[node];
                 if (union_find.do_union(a, b)) {
@@ -403,7 +431,9 @@ namespace js {
             });
 
 
-            // Intra cluster edge filtering and cheapest edge selection.
+            // Second Boruvka Step
+
+            // Intra cluster edge filtering and cheapest edge selection
             filter_and_map_edges([&](const auto &edge) constexpr noexcept {
                 if (is_better(edge, cheapest_edges[edge.a])) {
                     cheapest_edges[edge.a] = edge;
@@ -411,6 +441,7 @@ namespace js {
             });
             if (G.edges.empty()) return G;
 
+            // About 25% of nodes have at least one incident edge after the first boruvka step
             map_all_nodes_and_set_active([&](auto node) constexpr noexcept {
                 auto &[a, b, u, v, w] = cheapest_edges[node];
                 if (union_find.do_union(a, b)) {
@@ -419,8 +450,9 @@ namespace js {
                 }
             });
 
-            for (int k = 0; k < num_steps - 2; ++k) {
-                // Intra cluster edge filtering and cheapest edge selection.
+            // Third to second to last Boruvka Step
+            for (int k = 0; k < num_steps - 3; ++k) {
+                // Intra cluster edge filtering and cheapest edge selection
                 filter_and_map_edges([&](const auto &edge) {
                     if (is_better(edge, cheapest_edges[edge.a])) {
                         cheapest_edges[edge.a] = edge;
@@ -436,6 +468,25 @@ namespace js {
                     }
                 });
             }
+
+            // Last Boruvka Step
+
+            // Intra cluster edge filtering and cheapest edge selection
+            filter_and_map_edges([&](const auto &edge) {
+                if (is_better(edge, cheapest_edges[edge.a])) {
+                    cheapest_edges[edge.a] = edge;
+                }
+            });
+            if (G.edges.empty()) return G;
+
+            // active_nodes won't be used later, so there is no need to update it
+            map_active_nodes([&](auto node) noexcept {
+                auto &[a, b, u, v, w] = cheapest_edges[node];
+                if (union_find.do_union(a, b)) {
+                    mst.emplace_back(u, v, w);
+                    mst.emplace_back(v, u, w);
+                }
+            });
 
             return G;
         }
